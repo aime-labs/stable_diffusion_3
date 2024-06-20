@@ -199,11 +199,11 @@ class SDXLClipGTokenizer(SDTokenizer):
 
 
 class SD3Tokenizer:
-    def __init__(self):
+    def __init__(self, legacy):
         clip_tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         self.clip_l = SDTokenizer(tokenizer=clip_tokenizer)
         self.clip_g = SDXLClipGTokenizer(clip_tokenizer)
-        self.t5xxl = T5XXLTokenizer()
+        self.t5xxl = T5XXLTokenizer(legacy)
 
     def tokenize_with_weights(self, text:str):
         out = {}
@@ -300,8 +300,8 @@ class T5XXLModel(SDClipModel):
 
 class T5XXLTokenizer(SDTokenizer):
     """Wraps the T5 Tokenizer from HF into the SDTokenizer interface"""
-    def __init__(self):
-        super().__init__(pad_with_end=False, tokenizer=T5TokenizerFast.from_pretrained("google/t5-v1_1-xxl"), has_start_token=False, pad_to_max_length=False, max_length=99999999, min_length=77)
+    def __init__(self, legacy):
+        super().__init__(pad_with_end=False, tokenizer=T5TokenizerFast.from_pretrained("google/t5-v1_1-xxl", legacy=legacy), has_start_token=False, pad_to_max_length=False, max_length=99999999, min_length=77)
 
 
 class T5LayerNorm(torch.nn.Module):

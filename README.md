@@ -1,35 +1,55 @@
-# Stable Diffusion 3 Micro-Reference Implementation
+### AIME Fork of Stable Diffusion 3 Micro-Reference Implementation
 
-Inference-only tiny reference implementation of SD3.
+- Ready to use as a worker for the [AIME API Server](https://github.com/aime-team/aime-api-server)
+- Added possibility to generate multiple images at once
+- Preview images while processing
+- Text to Image and Image to Image
 
-Contains code for the text encoders (OpenAI CLIP-L/14, OpenCLIP bigG, Google T5-XXL) (these models are all public), the VAE Decoder (similar to previous SD models, but 16-channels and no postquantconv step), and the core MM-DiT (entirely new).
 
-Everything you need to inference SD3 excluding the weights files.
+### Download weigths
 
-Note: this repo is an early reference lib meant to assist partner organizations in implementing SD3. For normal inference, use [Comfy](https://github.com/comfyanonymous/ComfyUI) or UIs based on it such as [Swarm](https://github.com/Stability-AI/StableSwarmUI).
-
-### Install
-
-```sh
-# Note: on windows use "python" not "python3"
-python3 -s -m venv venv
-source ./venv/bin/activate
-# or on windows: venv/scripts/activate
-python3 -s -m pip install -r requirements.txt
+```shell
+sudo apt-get install git-lfs
+git lfs install
+mkdir /destination/to/checkpoints
+cd /destination/to/checkpoints
+git clone https://huggingface.co/stabilityai/stable-diffusion-3-medium
 ```
 
-### Test Usage
-
-```sh
-# Generate a cat on ref model with default settings
-python3 -s sd3_infer.py
-# Generate a 1024 cat on SD3-8B
-python3 -s sd3_infer.py --width 1024 --height 1024 --shift 3 --model models/sd3_medium.safetensors --prompt "cute wallpaper art of a cat"
-# Or for parameter listing
-python3 -s sd3_infer.py --help
+### Clone this repo
+```shell
+cd /destination/to/repo
+git clone https://github.com/aime-labs/stable_diffusion_3
 ```
 
-Images will be output to `output.png` by default
+### Setting up AIME MLC
+```shell
+
+mlc-create sd3 Pytorch 2.3.1-aime -d="/destination/to/checkpoints" -w="/destination/to/repo"
+```
+The -d flag will mout /destination/to/checkpoints to /data in the container
+The -w flag will mout /destination/to/repo to /workspace in the container
+
+
+### Install requirements in AIME MLC
+```shell
+mlc-open sd3
+
+pip install -r /workspace/stable_diffusion_3/requirements.txt
+
+```
+
+### Run SD3 inference as HTTP/HTTPS API with AIME API Server
+
+To run Stable Diffusion XL as HTTP/HTTPS API with [AIME API Server](https://github.com/aime-team/aime-api-server) start the chat command with following command line:
+
+```shell
+mlc-open sd3
+python3 /workspace/stable_diffusion_3/main.py --api_server <url to API server> --ckpt_dir /data/stable-diffusion-3-medium
+```
+
+It will start Stable Diffusion 3 as worker, waiting for job request through the AIME API Server.
+
 
 ### File Guide
 
@@ -43,16 +63,7 @@ Images will be output to `output.png` by default
     - `t5xxl.safetensors` (google T5-v1.1-XXL, can grab a public copy)
     - `sd3_medium.safetensors` (or whichever main MMDiT model file)
 
-### Code Origin
 
-The code included here originates from:
-- Stability AI internal research code repository (MM-DiT)
-- Public Stability AI repositories (eg VAE)
-- Some unique code for this reference repo written by Alex Goodwin for Stability AI
-- Some code from ComfyUI internal Stability impl of SD3 (for some code corrections and handlers)
-- HuggingFace and upstream providers (for sections of CLIP/T5 code)
-
-### Legal
 
 MIT License
 
@@ -75,7 +86,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-#### Note
-
-Some code in `other_impls` originates from HuggingFace and is subject to [the HuggingFace Transformers Apache2 License](https://github.com/huggingface/transformers/blob/main/LICENSE)

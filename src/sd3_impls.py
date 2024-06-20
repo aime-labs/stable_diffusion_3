@@ -1,7 +1,7 @@
 ### Impls of the SD3 core diffusion model and VAE
 
 import torch, math, einops
-from mmdit import MMDiT
+from .mmdit import MMDiT
 from PIL import Image
 
 
@@ -118,15 +118,17 @@ class SD3LatentFormat:
             [ 0.0815,  0.0846,  0.1207], [-0.0120, -0.0055, -0.0867],
             [-0.0749, -0.0634, -0.0456], [-0.1418, -0.1457, -0.1259]
         ], device="cpu")
-        latent_image = x0[0].permute(1, 2, 0).cpu() @ factors
+        image_list = list()
+        for x in x0:
 
-        latents_ubyte = (((latent_image + 1) / 2)
+            latent_image = x.permute(1, 2, 0).cpu() @ factors
+
+            latents_ubyte = (((latent_image + 1) / 2)
                             .clamp(0, 1)  # change scale from -1..1 to 0..1
                             .mul(0xFF)  # to 0..255
                             .byte()).cpu()
-
-        return Image.fromarray(latents_ubyte.numpy())
-
+            image_list.append(Image.fromarray(latents_ubyte.numpy()))
+        return image_list
 
 #################################################################################################
 ### K-Diffusion Sampling
@@ -146,18 +148,24 @@ def to_d(x, sigma, denoised):
 
 @torch.no_grad()
 @torch.autocast("cuda", dtype=torch.float16)
-def sample_euler(model, x, sigmas, extra_args=None):
+def sample_euler(model, x, sigmas, extra_args=None, callback=None):
     """Implements Algorithm 2 (Euler steps) from Karras et al. (2022)."""
     extra_args = {} if extra_args is None else extra_args
     s_in = x.new_ones([x.shape[0]])
-    for i in range(len(sigmas) - 1):
+    total_steps = len(sigmas) - 1
+    for i in range(total_steps):
         sigma_hat = sigmas[i]
+        b = sigma_hat * s_in
         denoised = model(x, sigma_hat * s_in, **extra_args)
         d = to_d(x, sigma_hat, denoised)
         dt = sigmas[i + 1] - sigma_hat
         # Euler method
         x = x + d * dt
+        progress = round(i * 100 / total_steps)
+        callback(x, progress, False)
+    
     return x
+
 
 
 #################################################################################################
