@@ -27,8 +27,9 @@ git clone https://github.com/aime-labs/stable_diffusion_3
 
 mlc-create sd3 Pytorch 2.3.1-aime -d="/destination/to/checkpoints" -w="/destination/to/repo"
 ```
-The -d flag will mout /destination/to/checkpoints to /data in the container
-The -w flag will mout /destination/to/repo to /workspace in the container
+The -d flag will mount /destination/to/checkpoints to /data in the container. 
+
+The -w flag will mount /destination/to/repo to /workspace in the container.
 
 
 ### Install requirements in AIME MLC
