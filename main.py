@@ -30,7 +30,9 @@ class ProcessOutputCallback():
 
     def process_output(self, latent_image, progress=100, finished=True, error=None):
         
-        if ( latent_image is None ) or error:
+        if error:
+            print('error')
+            self.api_worker.send_progress(100, None)
             image = Image.fromarray((np.random.rand(1024,1024,3) * 255).astype(np.uint8))
             return self.api_worker.send_job_results({'images': [image], 'error': error})
         else:
@@ -44,7 +46,6 @@ class ProcessOutputCallback():
                         image_list = SD3LatentFormat().decode_latent_to_preview(latent_image)
  
                     return self.api_worker.send_progress(progress, {'progress_images': image_list})
-
             else:
                 image_list = self.inferencer.vae_decode(SD3LatentFormat().process_out(latent_image))
                 self.api_worker.send_progress(100, None)
@@ -117,7 +118,7 @@ def main():
     while True:
         try:
             job_data = api_worker.job_request()
-            print(f'Processing job {job_data.get("job_id")}...')
+            print(f'Processing job {job_data.get("job_id")}...', end='', flush=True)
             job_data = set_seed(job_data)
             init_image = job_data.get('image')
             if init_image:
@@ -140,12 +141,18 @@ def main():
                 init_image,
                 job_data.get('denoise')
             )
-
+            print('Done')
         except ValueError as exc:
+            print('Error')
             callback.process_output(None , 100, True, f'{exc}\nChange parameters and try again')
             continue
         except torch.cuda.OutOfMemoryError as exc:
+            print('Error')
             callback.process_output(None, 100, True, f'{exc}\nReduce number of samples or image size and try again')
+            continue
+        except OSError as exc:
+            print('Error')
+            callback.process_output(None, 100, True, f'{exc}\nInvalid image file')
             continue
 
 if __name__ == "__main__":
