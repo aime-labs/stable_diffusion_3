@@ -4,7 +4,6 @@ torch
 torchvision
 numpy
 pillow
-numpy
 einops
 sentencepiece
 protobuf
