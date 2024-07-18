@@ -199,7 +199,9 @@ class SD3Inferencer:
         return { "c_crossattn": cond, "y": pooled }
 
     def do_sampling(self, latent, seed, conditioning, neg_cond, steps, cfg_scale, denoise=1.0, callback=None) -> torch.Tensor:
-        print("Sampling...", end='', flush=True)
+        message = 'Sampling...'
+        print(message, end='', flush=True)
+        callback(latent, 3, False, message=message)
         latent = latent.half().cuda()
         self.sd3.model = self.sd3.model.cuda()
         noise = self.get_noise(seed, latent).cuda()
@@ -260,15 +262,26 @@ class SD3Inferencer:
     def gen_image(self, prompt, negative_prompt, callback, num_samples=1, width=1024, height=1024, steps=28, cfg_scale=5, seed=1, init_image=None, denoise=0.6):
         
         if init_image:
+            callback(None, 0, False, message='Denoising input image...')
             latent = SD3LatentFormat().process_in(self.vae_encode(init_image, num_samples))
+            
         else:
+            callback(None, 0, False, message='Generating empty latent image...')
             latent = self.get_empty_latent(width, height, num_samples)
-        print("Encode prompt...", end='', flush=True)
+
+        message = 'Encoding prompt...'
+        callback(latent, 1, False, message=message)
+
+        print(message, end='', flush=True)
         conditioning = self.get_cond(prompt, num_samples)
         print('Done')
-        print("Encode negative prompt...", end='', flush=True)
+        message = 'Encoding negative prompt...'
+        print(message, end='', flush=True)
+        callback(latent, 2, False, message=message)
         neg_cond = self.get_cond(negative_prompt, num_samples)
         print('Done')
+        
+        
         sampled_latent = self.do_sampling(latent, seed, conditioning, neg_cond, steps, cfg_scale, denoise if init_image else 1.0, callback)
         callback(sampled_latent)
         #image = self.vae_decode(sampled_latent)

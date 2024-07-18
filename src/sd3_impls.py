@@ -161,8 +161,7 @@ def sample_euler(model, x, sigmas, extra_args=None, callback=None):
         dt = sigmas[i + 1] - sigma_hat
         # Euler method
         x = x + d * dt
-        progress = round(i * 100 / total_steps)
-        callback(x, progress, False)
+        callback(x, i+3, False)
     
     return x
 

@@ -1,4 +1,3 @@
-
 from pathlib import Path
 import random
 import argparse
@@ -22,43 +21,39 @@ VERSION = 0
 
 
 class ProcessOutputCallback():
-    def __init__(self, api_worker, inferencer):
+    def __init__(self, api_worker, inferencer, model_name):
         self.api_worker = api_worker
         self.inferencer = inferencer
+        self.model_name = model_name
         self.job_data = None
 
 
-    def process_output(self, latent_image, progress=100, finished=True, error=None):
+    def process_output(self, latent_image, progress_step=100, finished=True, error=None, message=None):
         
         if error:
             print('error')
             self.api_worker.send_progress(100, None)
             image = Image.fromarray((np.random.rand(1024,1024,3) * 255).astype(np.uint8))
-            return self.api_worker.send_job_results({'images': [image], 'error': error})
+            return self.api_worker.send_job_results({'images': [image], 'error': error, 'model_name': self.model_name})
         else:
             if not finished:
+                step_factor = self.job_data.get('denoise') if self.job_data.get('image') else 1
+                total_steps = int(self.job_data.get('steps') * step_factor) + 3
+                progress_info = round((progress_step) * 100 / total_steps)
+
                 if self.api_worker.progress_data_received:
-                    if self.job_data.get('provide_progress_images') == 'None':
-                        return self.api_worker.send_progress(progress)
-                    elif self.job_data.get('provide_progress_images') == 'decoded':
-                        image_list = self.inferencer.vae_decode(SD3LatentFormat().process_out(latent_image))
-                    elif self.job_data.get('provide_progress_images') == 'latent':
-                        image_list = SD3LatentFormat().decode_latent_to_preview(latent_image)
+                    progress_data = {'progress_message': message}
+                    if latent_image is not None:
+                        if self.job_data.get('provide_progress_images') == 'decoded':
+                            progress_data['progress_images'] = self.inferencer.vae_decode(SD3LatentFormat().process_out(latent_image))
+                        elif self.job_data.get('provide_progress_images') == 'latent':
+                            progress_data['progress_images'] = SD3LatentFormat().decode_latent_to_preview(latent_image)
  
-                    return self.api_worker.send_progress(progress, {'progress_images': image_list})
+                    return self.api_worker.send_progress(progress_info, progress_data)
             else:
                 image_list = self.inferencer.vae_decode(SD3LatentFormat().process_out(latent_image))
                 self.api_worker.send_progress(100, None)
-                return self.api_worker.send_job_results({'images': image_list})
-
-
-    def get_image_list(self, images):
-        image_list = list()
-        for image in images:
-            image = 255. * rearrange(image.cpu().numpy(), 'c h w -> h w c')
-            image = Image.fromarray(image.astype(np.uint8))
-            image_list.append(image)
-        return image_list
+                return self.api_worker.send_job_results({'images': image_list, 'model_name': self.model_name})
 
 
 def load_flags():
@@ -110,10 +105,10 @@ def set_seed(job_data):
 def main():
     args = load_flags()
     torch.cuda.set_device(args.gpu_id)
-    api_worker = APIWorkerInterface(args.api_server, WORKER_JOB_TYPE, args.api_auth_key, args.gpu_id, world_size=1, rank=0, gpu_name=torch.cuda.get_device_name())
+    api_worker = APIWorkerInterface(args.api_server, WORKER_JOB_TYPE, args.api_auth_key, args.gpu_id, world_size=1, rank=0, gpu_name=torch.cuda.get_device_name(), worker_version=VERSION)
     inferencer = SD3Inferencer()
     inferencer.load(Path(args.ckpt_dir), None, 3.0, args.legacy)
-    callback = ProcessOutputCallback(api_worker, inferencer)
+    callback = ProcessOutputCallback(api_worker, inferencer, 'stable-diffusion-3-medium')
 
     while True:
         try:
@@ -121,6 +116,9 @@ def main():
             print(f'Processing job {job_data.get("job_id")}...', end='', flush=True)
             job_data = set_seed(job_data)
             init_image = job_data.get('image')
+            print(                    job_data.get('width'), 
+                    job_data.get('height')
+            )
             if init_image:
                 init_image = convert_base64_string_to_image(
                     init_image,
@@ -144,15 +142,15 @@ def main():
             print('Done')
         except ValueError as exc:
             print('Error')
-            callback.process_output(None , 100, True, f'{exc}\nChange parameters and try again')
+            callback.process_output(None , None, True, f'{exc}\nChange parameters and try again')
             continue
         except torch.cuda.OutOfMemoryError as exc:
             print('Error')
-            callback.process_output(None, 100, True, f'{exc}\nReduce number of samples or image size and try again')
+            callback.process_output(None, None, True, f'{exc}\nReduce number of samples or image size and try again')
             continue
         except OSError as exc:
             print('Error')
-            callback.process_output(None, 100, True, f'{exc}\nInvalid image file')
+            callback.process_output(None, None, True, f'{exc}\nInvalid image file')
             continue
 
 if __name__ == "__main__":
